@@ -1,4 +1,4 @@
-use clap::{command, Args, Parser, Subcommand};
+use clap::{command, Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(
@@ -52,6 +52,20 @@ pub struct GraphArgs {
     pub subcommand: Option<GraphSubcommands>,
 }
 
+#[derive(Debug, Clone, ValueEnum)]
+pub enum JoinType {
+    Inner,
+    Left,
+    Right,
+    Full,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum DisplayType {
+    Png,
+    Pdf,
+}
+
 #[derive(Subcommand)]
 pub enum GraphSubcommands {
     /// Create a graph from SQL schema
@@ -60,6 +74,9 @@ pub enum GraphSubcommands {
         /// Path to SQL schema file
         #[arg()]
         schema: String,
+        /// Output format (dot, json, text)
+        #[arg(short, long, default_value = "png")]
+        format: DisplayType,
     },
 
     /// Find the shortest path between two tables
@@ -80,9 +97,9 @@ pub enum GraphSubcommands {
     /// Display the graph structure
     #[command()]
     Display {
-        /// Output format (dot, json, text)
-        #[arg(short, long, default_value = "text")]
-        format: String,
+        /// Output format (png, pdf)
+        #[arg(short, long, default_value = "png")]
+        format: DisplayType,
     },
 
     /// Join two CSV files
@@ -96,7 +113,7 @@ pub enum GraphSubcommands {
         right_table: String,
         /// Join type (inner, left, right, full)
         #[arg(short, long, default_value = "inner")]
-        r#type: String,
+        r#type: JoinType,
     },
 }
 
@@ -147,7 +164,7 @@ pub enum CsvSubcommands {
         right_column: String,
         /// Join type (inner, left, right, full)
         #[arg(short, long, default_value = "inner")]
-        r#type: String,
+        r#type: JoinType,
     },
 
     /// Concatenate CSV files vertically

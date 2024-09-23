@@ -1,9 +1,10 @@
-use crate::cli::{GraphArgs, GraphSubcommands};
+use crate::cli::{DisplayType, GraphArgs, GraphSubcommands};
 use crate::config::{self, Config};
 use crate::csv::{human_readable_bytes, DataFrame};
 use crate::graph;
 use crate::utils::print_info;
 use petgraph::algo::dijkstra;
+use petgraph::data::FromElements;
 use petgraph::graph::{NodeIndex, UnGraph};
 use std::error::Error;
 use std::fs::File;
@@ -24,17 +25,28 @@ pub fn execute(args: &GraphArgs) -> Result<(), Box<dyn Error>> {
 
     let g = config::read_graph_cache(&config_dir)?;
 
+    fn get_type(format: &DisplayType) -> &str {
+        match format {
+            DisplayType::Pdf => "pdf",
+            DisplayType::Png => "png",
+        }
+    }
+
     match &args.subcommand {
         Some(subcommand) => match subcommand {
-            GraphSubcommands::Create { schema } => handle_graph_create(schema, &config, &g),
+            GraphSubcommands::Create { schema, format } => {
+                handle_graph_create(schema, &config, &g, get_type(format))
+            }
             GraphSubcommands::ShortestPath { from, to } => handle_graph_shortest_path(from, to, &g),
             GraphSubcommands::Join {
                 left_table,
                 right_table,
                 ..
             } => handle_graph_join(&config, left_table, right_table, &g),
-            GraphSubcommands::Mst => handle_graph_mst(&g),
-            GraphSubcommands::Display { .. } => handle_graph_display(&g, &config),
+            GraphSubcommands::Mst => handle_graph_mst(&g, &config),
+            GraphSubcommands::Display { format } => {
+                handle_graph_display(&g, &config, "graph", get_type(format))
+            }
         },
         None => Ok(()),
     }
@@ -54,6 +66,7 @@ fn handle_graph_create(
     schema: &str,
     config: &Config,
     g: &UnGraph<DataFrame, (String, String)>,
+    format: &str,
 ) -> Result<(), Box<dyn Error>> {
     let _schema_path = if !schema.is_empty() {
         Path::new(schema).to_path_buf()
@@ -66,10 +79,10 @@ fn handle_graph_create(
     std::fs::create_dir_all(output_dir)?;
 
     let dot_file = output_dir.join("graph.dot");
-    let png_file = output_dir.join("graph.png");
+    let png_file = output_dir.join(format!("graph.{}", format));
 
     save_dot_file(&dot_file, &dot_content)?;
-    run_dot_command(&dot_file, &png_file)?;
+    run_dot_command(&dot_file, &png_file, format)?;
     graph::open_dot_file(&png_file)?;
 
     Ok(())
@@ -279,24 +292,30 @@ fn handle_graph_shortest_path(
 }
 
 /// Handle the Minimum Spanning Tree operation (not implemented).
-fn handle_graph_mst(_: &UnGraph<DataFrame, (String, String)>) -> Result<(), Box<dyn Error>> {
-    println!("MST functionality not implemented yet.");
-    Ok(())
+fn handle_graph_mst(
+    g: &UnGraph<DataFrame, (String, String)>,
+    config: &Config,
+) -> Result<(), Box<dyn Error>> {
+    let mst = petgraph::algo::min_spanning_tree(g);
+    let mst: UnGraph<DataFrame, (String, String)> = petgraph::Graph::from_elements(mst);
+    handle_graph_display(&mst, &config, "mst", "png")
 }
 /// Handle the display of the graph.
 fn handle_graph_display(
     g: &UnGraph<DataFrame, (String, String)>,
     config: &Config,
+    output: &str,
+    format: &str,
 ) -> Result<(), Box<dyn Error>> {
     let dot_content = graph::write_dot_file(g);
     let output_dir = Path::new(&config.output_path);
     std::fs::create_dir_all(output_dir)?;
 
-    let dot_file = output_dir.join("graph.dot");
-    let png_file = output_dir.join("graph.png");
+    let dot_file = output_dir.join(format!("{}.dot", output));
+    let png_file = output_dir.join(format!("{}.{}", output, format));
 
     save_dot_file(&dot_file, &dot_content)?;
-    run_dot_command(&dot_file, &png_file)?;
+    run_dot_command(&dot_file, &png_file, format)?;
     graph::open_dot_file(&png_file)?;
 
     Ok(())
@@ -311,10 +330,14 @@ fn save_dot_file(dot_file: &Path, content: &str) -> Result<(), Box<dyn Error>> {
 }
 
 /// Run the 'dot' command to generate a PNG file from the DOT file.
-fn run_dot_command(dot_file: &Path, output_file: &Path) -> Result<(), Box<dyn Error>> {
+fn run_dot_command(
+    dot_file: &Path,
+    output_file: &Path,
+    format: &str,
+) -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::new("dot")
         .args(&[
-            "-Tpng",
+            &format!("-T{}", format),
             dot_file.to_str().unwrap(),
             "-o",
             output_file.to_str().unwrap(),
