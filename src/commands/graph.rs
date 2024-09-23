@@ -25,13 +25,6 @@ pub fn execute(args: &GraphArgs) -> Result<(), Box<dyn Error>> {
 
     let g = config::read_graph_cache(&config_dir)?;
 
-    fn get_type(format: &DisplayType) -> &str {
-        match format {
-            DisplayType::Pdf => "pdf",
-            DisplayType::Png => "png",
-        }
-    }
-
     match &args.subcommand {
         Some(subcommand) => match subcommand {
             GraphSubcommands::Create { schema, format } => {
@@ -49,6 +42,13 @@ pub fn execute(args: &GraphArgs) -> Result<(), Box<dyn Error>> {
             }
         },
         None => Ok(()),
+    }
+}
+
+fn get_type(format: &DisplayType) -> &str {
+    match format {
+        DisplayType::Pdf => "pdf",
+        DisplayType::Png => "png",
     }
 }
 
@@ -105,57 +105,37 @@ fn handle_graph_join(
     Ok(())
 }
 
-/// Update the DataFrame after a join operation.
-pub fn update_dataframe_after_join(
-    left_df: &DataFrame,
-    right_df: &DataFrame,
-    left_col: &str,
-    right_col: &str,
-) -> DataFrame {
-    let mut new_df = left_df.clone();
-
-    new_df
-        .headers
-        .extend(right_df.headers.iter().filter(|&h| h != right_col).cloned());
-
-    new_df.header_indices = new_df
-        .headers
-        .iter()
-        .enumerate()
-        .map(|(i, h)| (h.clone(), i))
-        .collect();
-
-    new_df.foreign_keys.extend(
-        right_df
-            .foreign_keys
-            .iter()
-            .filter(|&(col, _, _)| col != right_col)
-            .cloned(),
-    );
-
-    if right_df.primary_key.as_ref() == Some(&right_col.to_string()) {
-        new_df.primary_key = Some(left_col.to_string());
-    }
-
-    new_df
+/// Find a node in the graph by table name.
+pub fn find_node(
+    g: &UnGraph<DataFrame, (String, String)>,
+    table: &str,
+) -> Result<NodeIndex, Box<dyn Error>> {
+    g.node_indices()
+        .find(|&node| g[node].name == table)
+        .ok_or_else(|| format!("Table '{}' not found in graph", table).into())
 }
 
-/// Find suitable join columns between two DataFrames.
-pub fn find_join_columns(
-    left: &DataFrame,
-    right: &DataFrame,
-) -> Result<(String, String), Box<dyn Error>> {
-    for (left_col, _, right_col) in &left.foreign_keys {
-        if right.headers.contains(right_col) {
-            return Ok((left_col.clone(), right_col.clone()));
-        }
+/// Find the shortest path between two nodes in the graph.
+pub fn find_shortest_path(
+    g: &UnGraph<DataFrame, (String, String)>,
+    start: NodeIndex,
+    end: NodeIndex,
+) -> Result<Vec<NodeIndex>, Box<dyn Error>> {
+    let res = dijkstra(g, start, Some(end), |_| 1);
+    let mut path = Vec::new();
+    let mut current = end;
+
+    while current != start {
+        path.push(current);
+        current = g
+            .neighbors(current)
+            .filter(|n| res.contains_key(n))
+            .min_by_key(|n| res[n])
+            .ok_or("Path reconstruction failed")?;
     }
-    for (right_col, _, left_col) in &right.foreign_keys {
-        if left.headers.contains(left_col) {
-            return Ok((left_col.clone(), right_col.clone()));
-        }
-    }
-    Err("No suitable join columns found".into())
+    path.push(start);
+    path.reverse();
+    Ok(path)
 }
 
 /// Join tables along the shortest path between two nodes.
@@ -242,37 +222,57 @@ fn join_tables_along_path(
     Ok(())
 }
 
-/// Find a node in the graph by table name.
-pub fn find_node(
-    g: &UnGraph<DataFrame, (String, String)>,
-    table: &str,
-) -> Result<NodeIndex, Box<dyn Error>> {
-    g.node_indices()
-        .find(|&node| g[node].name == table)
-        .ok_or_else(|| format!("Table '{}' not found in graph", table).into())
+/// Find suitable join columns between two DataFrames.
+pub fn find_join_columns(
+    left: &DataFrame,
+    right: &DataFrame,
+) -> Result<(String, String), Box<dyn Error>> {
+    for (left_col, _, right_col) in &left.foreign_keys {
+        if right.headers.contains(right_col) {
+            return Ok((left_col.clone(), right_col.clone()));
+        }
+    }
+    for (right_col, _, left_col) in &right.foreign_keys {
+        if left.headers.contains(left_col) {
+            return Ok((left_col.clone(), right_col.clone()));
+        }
+    }
+    Err("No suitable join columns found".into())
 }
 
-/// Find the shortest path between two nodes in the graph.
-pub fn find_shortest_path(
-    g: &UnGraph<DataFrame, (String, String)>,
-    start: NodeIndex,
-    end: NodeIndex,
-) -> Result<Vec<NodeIndex>, Box<dyn Error>> {
-    let res = dijkstra(g, start, Some(end), |_| 1);
-    let mut path = Vec::new();
-    let mut current = end;
+/// Update the DataFrame after a join operation.
+pub fn update_dataframe_after_join(
+    left_df: &DataFrame,
+    right_df: &DataFrame,
+    left_col: &str,
+    right_col: &str,
+) -> DataFrame {
+    let mut new_df = left_df.clone();
 
-    while current != start {
-        path.push(current);
-        current = g
-            .neighbors(current)
-            .filter(|n| res.contains_key(n))
-            .min_by_key(|n| res[n])
-            .ok_or("Path reconstruction failed")?;
+    new_df
+        .headers
+        .extend(right_df.headers.iter().filter(|&h| h != right_col).cloned());
+
+    new_df.header_indices = new_df
+        .headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| (h.clone(), i))
+        .collect();
+
+    new_df.foreign_keys.extend(
+        right_df
+            .foreign_keys
+            .iter()
+            .filter(|&(col, _, _)| col != right_col)
+            .cloned(),
+    );
+
+    if right_df.primary_key.as_ref() == Some(&right_col.to_string()) {
+        new_df.primary_key = Some(left_col.to_string());
     }
-    path.push(start);
-    path.reverse();
-    Ok(path)
+
+    new_df
 }
 
 /// Handle the shortest path operation between two nodes in the graph.
@@ -291,7 +291,7 @@ fn handle_graph_shortest_path(
     Ok(())
 }
 
-/// Handle the Minimum Spanning Tree operation (not implemented).
+/// Handle the Minimum Spanning Tree operation .
 fn handle_graph_mst(
     g: &UnGraph<DataFrame, (String, String)>,
     config: &Config,
