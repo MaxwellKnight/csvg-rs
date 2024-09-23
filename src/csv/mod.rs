@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
+use std::time::Instant;
 
 /// Represents a data frame with CSV data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,10 +79,15 @@ impl DataFrame {
         input: &mut R,
         output: &mut W,
     ) -> Result<(), Box<dyn Error>> {
+        let timer = Instant::now();
         self.process_rows(input, |row| {
             writeln!(output, "{}", row.join(","))?;
             Ok(())
-        })
+        })?;
+        let duration = timer.elapsed();
+        println!("Operation took: {:.2?}\n", duration);
+
+        Ok(())
     }
 
     /// Drops specified columns from CSV data.
@@ -106,11 +112,16 @@ impl DataFrame {
 
         writeln!(output, "{}", new_headers.join(","))?;
 
+        let timer = Instant::now();
         self.process_rows(input, |row| {
             let new_row: Vec<String> = indices_to_keep.iter().map(|&i| row[i].clone()).collect();
             writeln!(output, "{}", new_row.join(","))?;
             Ok(())
-        })
+        })?;
+        let duration = timer.elapsed();
+        println!("Operation took: {:.2?}\n", duration);
+
+        Ok(())
     }
 
     /// Selects specified columns from CSV data.
@@ -127,7 +138,12 @@ impl DataFrame {
             .cloned()
             .collect();
 
-        self.drop_stream(input, output, &columns_to_drop)
+        let timer = Instant::now();
+        self.drop_stream(input, output, &columns_to_drop)?;
+        let duration = timer.elapsed();
+        println!("Operation took: {:.2?}\n", duration);
+
+        Ok(())
     }
 
     /// Performs a join operation on two CSV streams.
@@ -140,6 +156,7 @@ impl DataFrame {
         right_key: &str,
     ) -> Result<(), Box<dyn Error>> {
         // Function to parse CSV line
+        let timer = Instant::now();
         fn parse_csv_line(line: &str) -> Vec<String> {
             line.split(',').map(|s| s.trim().to_string()).collect()
         }
@@ -205,6 +222,8 @@ impl DataFrame {
             }
         }
 
+        let duration = timer.elapsed();
+        println!("Operation took: {:.2?}\n", duration);
         Ok(())
     }
 }
