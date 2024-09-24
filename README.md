@@ -15,7 +15,7 @@ csvg is a versatile command-line tool designed for SQL schema analysis and CSV f
 - SQL schema parsing and graph operations:
   - Create graph from SQL schema
   - Find shortest path between tables
-  - Generate minimum spanning tree (planned)
+  - Generate minimum spanning tree 
   - Display graph structure
 - Graph visualization of database relationships
 - Configuration management
@@ -116,7 +116,6 @@ csvg is designed to be easily extensible. Here are some areas where you can cont
 5. **GUI Development**: Create a graphical user interface for the tool.
 6. **Configuration Options**: Expand the configuration system with more customizable settings.
 7. **Graph Algorithms**: Implement additional graph algorithms for schema analysis.
-8. **Join Types**: Implement different types of joins (e.g., left, right, full outer)
 9. **Performance Optimization**: Further optimize large dataset handling and join operations
 
 ## Contributing
