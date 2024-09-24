@@ -209,7 +209,8 @@ fn join_tables_along_path(
     }
 
     let mut final_reader = BufReader::new(temp_file.reopen()?);
-    let mut final_writer = BufWriter::new(File::create(&config.output_file)?);
+    let stdout = std::io::stdout();
+    let mut final_writer = BufWriter::new(stdout.lock());
     let bytes_copied = std::io::copy(&mut final_reader, &mut final_writer)?;
     final_writer.flush()?;
 

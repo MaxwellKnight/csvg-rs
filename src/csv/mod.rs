@@ -7,6 +7,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::time::Instant;
 
+use crate::utils::print_info;
+
 /// Represents a data frame with CSV data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataFrame {
@@ -85,7 +87,7 @@ impl DataFrame {
             Ok(())
         })?;
         let duration = timer.elapsed();
-        println!("Operation took: {:.2?}\n", duration);
+        print_info(&format!("Operation took: {:.2?}\n", duration));
 
         Ok(())
     }
@@ -119,7 +121,7 @@ impl DataFrame {
             Ok(())
         })?;
         let duration = timer.elapsed();
-        println!("Operation took: {:.2?}\n", duration);
+        print_info(&format!("Operation took: {:.2?}\n", duration));
 
         Ok(())
     }
@@ -141,7 +143,7 @@ impl DataFrame {
         let timer = Instant::now();
         self.drop_stream(input, output, &columns_to_drop)?;
         let duration = timer.elapsed();
-        println!("Operation took: {:.2?}\n", duration);
+        print_info(&format!("Operation took: {:.2?}\n", duration));
 
         Ok(())
     }
@@ -223,7 +225,7 @@ impl DataFrame {
         }
 
         let duration = timer.elapsed();
-        println!("Operation took: {:.2?}\n", duration);
+        print_info(&format!("Operation took: {:.2?}\n", duration));
         Ok(())
     }
 }

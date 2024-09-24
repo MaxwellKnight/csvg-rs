@@ -8,10 +8,6 @@ use clap::{command, Args, Parser, Subcommand, ValueEnum};
     long_about = "csvgraph is a command-line tool designed for SQL schema analysis and CSV file manipulation. It allows you to create graphs from SQL schemas, find the shortest paths between tables, and perform various CSV file operations."
 )]
 pub struct Cli {
-    /// Specify output file for the result
-    #[arg(short, long, global = true)]
-    pub output: Option<String>,
-
     #[command(subcommand)]
     pub command: Commands,
 }
