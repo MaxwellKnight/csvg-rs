@@ -1,4 +1,5 @@
 use prettytable::csv::{ReaderBuilder, Writer};
+use prettytable::{format, Table};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
@@ -240,14 +241,19 @@ pub fn read_csv_stream(
     let reader = BufReader::new(file);
     let mut lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
 
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_BOX_CHARS);
+    table.set_titles(lines[0].split(',').into());
+
     if reverse {
         lines.reverse();
     }
 
     let count = lines_count.unwrap_or(lines.len());
-    for line in lines.into_iter().take(count) {
-        println!("{}", line);
+    for line in lines.into_iter().skip(1).take(count) {
+        table.add_row(line.split(',').into());
     }
+    table.printstd();
 
     Ok(())
 }
