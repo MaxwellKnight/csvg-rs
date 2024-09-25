@@ -53,7 +53,7 @@ fn get_type(format: &DisplayType) -> &str {
 }
 
 /// Regenerate and cache the graph data.
-fn regenerate_graph_cache(config_dir: &Path) -> Result<(), Box<dyn Error>> {
+pub fn regenerate_graph_cache(config_dir: &Path) -> Result<(), Box<dyn Error>> {
     print_info("Generating new graph data.");
     let g = graph::generate_graph(&config_dir.to_path_buf())?;
     config::write_graph_cache(&g, config_dir)?;
