@@ -58,16 +58,40 @@ fn parse_constraints(table: &mut DataFrame, constraints: &[TableConstraint]) {
     }
 }
 
-// In the parse_alter_table function
+fn parse_constraint(table: &mut DataFrame, constraint: &TableConstraint) {
+    if let TableConstraint::ForeignKey {
+        columns,
+        foreign_table,
+        referred_columns,
+        ..
+    } = constraint
+    {
+        let fks = [foreign_table.0.clone().remove(1)];
+
+        table
+            .foreign_keys
+            .extend(columns.iter().zip(&fks).zip(referred_columns.iter()).map(
+                |((src_column, dst_table), dst_column)| {
+                    (
+                        src_column.value.to_lowercase().to_owned(),
+                        dst_table.value.to_lowercase().to_owned(),
+                        dst_column.value.to_lowercase().to_owned(),
+                    )
+                },
+            ));
+    }
+}
+
 fn parse_alter_table(tables: &mut Vec<DataFrame>, ast: &Vec<Statement>) {
     for statement in ast {
         match &statement {
             Statement::AlterTable {
                 name, operations, ..
             } => {
-                // Changed this line to handle different name structures
-                let table_name = name.to_string().to_lowercase();
-                if let Some(table_index) = tables.iter().position(|t| t.name == table_name) {
+                if let Some(table_index) = tables
+                    .iter()
+                    .position(|t| t.name == name.0[1].value.to_lowercase())
+                {
                     for op in operations {
                         match op {
                             AlterTableOperation::AddConstraint(constraint) => {
@@ -81,34 +105,6 @@ fn parse_alter_table(tables: &mut Vec<DataFrame>, ast: &Vec<Statement>) {
             }
             _ => {}
         }
-    }
-}
-
-// In the parse_constraint function
-fn parse_constraint(table: &mut DataFrame, constraint: &TableConstraint) {
-    if let TableConstraint::ForeignKey {
-        columns,
-        foreign_table,
-        referred_columns,
-        ..
-    } = constraint
-    {
-        // Changed this line to safely get the foreign table name
-        let foreign_table_name = foreign_table.to_string().to_lowercase();
-
-        table.foreign_keys.extend(
-            columns
-                .iter()
-                .zip(std::iter::repeat(&foreign_table_name))
-                .zip(referred_columns.iter())
-                .map(|((src_column, dst_table), dst_column)| {
-                    (
-                        src_column.value.to_lowercase().to_owned(),
-                        dst_table.to_owned(),
-                        dst_column.value.to_lowercase().to_owned(),
-                    )
-                }),
-        );
     }
 }
 
