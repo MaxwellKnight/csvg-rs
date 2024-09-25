@@ -350,7 +350,11 @@ fn run_dot_command(
     let status = cmd.wait()?;
 
     if status.success() {
-        print_info(&format!("PNG file saved to {}", output_file.display()));
+        print_info(&format!(
+            "{} file saved to {}",
+            format.to_uppercase(),
+            output_file.display()
+        ));
         Ok(())
     } else {
         Err(format!("Failed to run `dot` command: {:?}", status).into())
