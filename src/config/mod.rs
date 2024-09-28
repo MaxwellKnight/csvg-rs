@@ -28,7 +28,7 @@ pub struct GraphvizSettings {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            output_file: String::from("output"),
+            output_file: String::from("output.csv"),
             output_path: PathBuf::from(".csvgraph/generated-files"),
             source_path: PathBuf::from("./"),
             graphviz_settings: GraphvizSettings {
