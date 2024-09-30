@@ -1,7 +1,7 @@
 use crate::{config, csv::DataFrame, graph, sql};
 use sqlparser::{
     ast::{AlterTableOperation, ColumnOption, Statement, TableConstraint},
-    dialect::GenericDialect,
+    dialect::PostgreSqlDialect,
     parser::Parser,
 };
 use std::{
@@ -11,7 +11,7 @@ use std::{
 
 /// Parses SQL content and extracts table definitions.
 pub fn parse_sql(contents: &str) -> Result<Vec<DataFrame>, Box<dyn Error>> {
-    let dialect = GenericDialect {};
+    let dialect = PostgreSqlDialect {};
     let ast = Parser::parse_sql(&dialect, &contents)?;
     let mut tables = ast
         .clone()
