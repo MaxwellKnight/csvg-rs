@@ -66,7 +66,8 @@ fn parse_constraint(table: &mut DataFrame, constraint: &TableConstraint) {
         ..
     } = constraint
     {
-        let fks = [foreign_table.0.clone().remove(1)];
+        let ident = foreign_table.0.last().unwrap();
+        let fks = [ident.clone()];
 
         table
             .foreign_keys
@@ -90,7 +91,7 @@ fn parse_alter_table(tables: &mut Vec<DataFrame>, ast: &Vec<Statement>) {
             } => {
                 if let Some(table_index) = tables
                     .iter()
-                    .position(|t| t.name == name.0[1].value.to_lowercase())
+                    .position(|t| t.name == name.0.last().unwrap().value.to_lowercase())
                 {
                     for op in operations {
                         match op {
