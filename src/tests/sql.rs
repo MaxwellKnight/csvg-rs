@@ -123,3 +123,79 @@ fn test_parse_sql_with_comments() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[test]
+fn test_parse_sql_with_comment_on_extension() -> Result<(), Box<dyn Error>> {
+    let sql = r#"
+        COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+        CREATE TABLE users (
+            id INT PRIMARY KEY,
+            name VARCHAR(255)
+        );
+    "#;
+
+    let tables = parse_sql(sql)?;
+
+    assert_eq!(tables.len(), 1);
+    let table = &tables[0];
+    assert_eq!(table.name, "users");
+
+    let expected_headers = vec!["id".to_string(), "name".to_string()];
+    assert_eq!(table.headers, expected_headers);
+
+    assert_eq!(table.primary_key, Some("id".to_string()));
+
+    Ok(())
+}
+
+#[test]
+fn test_parse_sql_with_comment_on_table() -> Result<(), Box<dyn Error>> {
+    let sql = r#"
+        COMMENT ON TABLE users IS 'Stores user information';
+        CREATE TABLE users (
+            id INT PRIMARY KEY,
+            name VARCHAR(255)
+        );
+    "#;
+
+    let tables = parse_sql(sql)?;
+
+    // Ensure that the COMMENT ON statement is ignored, and the table is parsed correctly
+    assert_eq!(tables.len(), 1);
+    let table = &tables[0];
+    assert_eq!(table.name, "users");
+
+    let expected_headers = vec!["id".to_string(), "name".to_string()];
+    assert_eq!(table.headers, expected_headers);
+
+    assert_eq!(table.primary_key, Some("id".to_string()));
+
+    Ok(())
+}
+
+#[test]
+fn test_parse_sql_with_multiple_comment_on_statements() -> Result<(), Box<dyn Error>> {
+    let sql = r#"
+        COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+        COMMENT ON TABLE users IS 'Stores user information';
+        CREATE TABLE users (
+            id INT PRIMARY KEY,
+            name VARCHAR(255)
+        );
+        COMMENT ON COLUMN users.name IS 'The name of the user';
+    "#;
+
+    let tables = parse_sql(sql)?;
+
+    // Ensure that all COMMENT ON statements are ignored, and only the table is parsed
+    assert_eq!(tables.len(), 1);
+    let table = &tables[0];
+    assert_eq!(table.name, "users");
+
+    let expected_headers = vec!["id".to_string(), "name".to_string()];
+    assert_eq!(table.headers, expected_headers);
+
+    assert_eq!(table.primary_key, Some("id".to_string()));
+
+    Ok(())
+}
