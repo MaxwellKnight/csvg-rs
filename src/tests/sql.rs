@@ -187,7 +187,6 @@ fn test_parse_sql_with_multiple_comment_on_statements() -> Result<(), Box<dyn Er
 
     let tables = parse_sql(sql)?;
 
-    // Ensure that all COMMENT ON statements are ignored, and only the table is parsed
     assert_eq!(tables.len(), 1);
     let table = &tables[0];
     assert_eq!(table.name, "users");
