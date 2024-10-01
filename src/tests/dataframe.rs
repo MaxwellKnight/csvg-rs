@@ -4,7 +4,10 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-use crate::csv::{human_readable_bytes, DataFrame};
+use crate::{
+    cli::JoinType,
+    csv::{human_readable_bytes, DataFrame},
+};
 
 #[test]
 fn test_dataframe_new() {
@@ -136,12 +139,148 @@ fn test_join_stream() -> Result<(), Box<dyn Error>> {
     let mut right_input = Cursor::new("id,age\n1,30\n2,25");
     let mut output = Vec::new();
 
-    df.join_stream(&mut left_input, &mut right_input, &mut output, "id", "id")?;
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Inner,
+    )?;
 
     assert_eq!(
         String::from_utf8(output)?,
         "id,name,age\n1,Alice,30\n2,Bob,25\n"
     );
+    Ok(())
+}
+
+fn setup_dataframe() -> DataFrame {
+    let mut df = DataFrame::new("test".to_string());
+    df.headers = vec!["id".to_string(), "name".to_string()];
+    df
+}
+
+#[test]
+fn test_inner_join() -> Result<(), Box<dyn Error>> {
+    let df = setup_dataframe();
+    let mut left_input = Cursor::new("id,name\n1,Alice\n2,Bob\n3,Charlie");
+    let mut right_input = Cursor::new("id,age\n1,30\n2,25\n4,35");
+    let mut output = Vec::new();
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Inner,
+    )?;
+    assert_eq!(
+        String::from_utf8(output)?,
+        "id,name,age\n1,Alice,30\n2,Bob,25\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_left_outer_join() -> Result<(), Box<dyn Error>> {
+    let df = setup_dataframe();
+    let mut left_input = Cursor::new("id,name\n1,Alice\n2,Bob\n3,Charlie");
+    let mut right_input = Cursor::new("id,age\n1,30\n2,25\n4,35");
+    let mut output = Vec::new();
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Left,
+    )?;
+    assert_eq!(
+        String::from_utf8(output)?,
+        "id,name,age\n1,Alice,30\n2,Bob,25\n3,Charlie,\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_right_outer_join() -> Result<(), Box<dyn Error>> {
+    let df = setup_dataframe();
+    let mut left_input = Cursor::new("id,name\n1,Alice\n2,Bob\n3,Charlie");
+    let mut right_input = Cursor::new("id,age\n1,30\n2,25\n4,35");
+    let mut output = Vec::new();
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Right,
+    )?;
+    assert_eq!(
+        String::from_utf8(output)?,
+        "id,name,age\n1,Alice,30\n2,Bob,25\n,,35\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_full_outer_join() -> Result<(), Box<dyn Error>> {
+    let df = setup_dataframe();
+    let mut left_input = Cursor::new("id,name\n1,Alice\n2,Bob\n3,Charlie");
+    let mut right_input = Cursor::new("id,age\n1,30\n2,25\n4,35");
+    let mut output = Vec::new();
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Full,
+    )?;
+    assert_eq!(
+        String::from_utf8(output)?,
+        "id,name,age\n1,Alice,30\n2,Bob,25\n3,Charlie,\n,,35\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_join_with_multiple_matches() -> Result<(), Box<dyn Error>> {
+    let df = setup_dataframe();
+    let mut left_input = Cursor::new("id,name\n1,Alice\n2,Bob\n2,Charlie");
+    let mut right_input = Cursor::new("id,age\n1,30\n2,25\n2,35");
+    let mut output = Vec::new();
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Inner,
+    )?;
+    assert_eq!(
+        String::from_utf8(output)?,
+        "id,name,age\n1,Alice,30\n2,Bob,25\n2,Bob,35\n2,Charlie,25\n2,Charlie,35\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_join_with_empty_inputs() -> Result<(), Box<dyn Error>> {
+    let df = setup_dataframe();
+    let mut left_input = Cursor::new("id,name\n");
+    let mut right_input = Cursor::new("id,age\n");
+    let mut output = Vec::new();
+    df.join_stream(
+        &mut left_input,
+        &mut right_input,
+        &mut output,
+        "id",
+        "id",
+        &JoinType::Full,
+    )?;
+    assert_eq!(String::from_utf8(output)?, "id,name,age\n");
     Ok(())
 }
 

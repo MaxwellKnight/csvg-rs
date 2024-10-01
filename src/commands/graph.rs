@@ -1,4 +1,4 @@
-use crate::cli::{DisplayType, GraphArgs, GraphSubcommands};
+use crate::cli::{DisplayType, GraphArgs, GraphSubcommands, JoinType};
 use crate::config::{self, Config};
 use crate::csv::{human_readable_bytes, DataFrame};
 use crate::graph;
@@ -185,6 +185,7 @@ fn join_tables_along_path(
                 &mut writer,
                 &left_col,
                 &right_col,
+                &JoinType::Inner,
             )?;
             writer.flush()?;
         }

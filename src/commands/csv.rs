@@ -1,4 +1,4 @@
-use crate::cli::{CsvArgs, CsvSubcommands};
+use crate::cli::{CsvArgs, CsvSubcommands, JoinType};
 use crate::config::{create_config_folder, read_config, Config};
 use crate::csv::{self, DataFrame};
 use crate::utils::print_info;
@@ -23,8 +23,8 @@ pub fn execute(args: &CsvArgs) -> Result<(), Box<dyn Error>> {
             file2,
             left_column,
             right_column,
-            ..
-        } => handle_join(&config, file1, file2, left_column, right_column),
+            r#type,
+        } => handle_join(&config, file1, file2, left_column, right_column, r#type),
     }
 }
 
@@ -117,6 +117,7 @@ fn handle_join(
     file2: &str,
     left_column: &str,
     right_column: &str,
+    r#type: &JoinType,
 ) -> Result<(), Box<dyn Error>> {
     let mut left_df = DataFrame::new(file1.to_string());
     let file1 = config.source_path.join(format!("{}.csv", file1));
@@ -134,6 +135,7 @@ fn handle_join(
         &mut writer,
         left_column,
         right_column,
+        r#type,
     )?;
     print_info(&format!(
         "Successfully joined '{:?}' and '{:?}' on columns '{}' and '{}'",

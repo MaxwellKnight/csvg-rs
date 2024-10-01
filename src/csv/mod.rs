@@ -1,13 +1,14 @@
 use prettytable::csv::{ReaderBuilder, Writer};
 use prettytable::{format, Table};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::time::Instant;
 
+use crate::cli::JoinType;
 use crate::utils::print_info;
 
 /// Represents a data frame with CSV data.
@@ -149,79 +150,163 @@ impl DataFrame {
         Ok(())
     }
 
-    /// Performs a join operation on two CSV streams.
-    pub fn join_stream<R1: BufRead, R2: BufRead, W: Write>(
-        &self,
-        left_input: &mut R1,
-        right_input: &mut R2,
-        output: &mut W,
-        left_key: &str,
-        right_key: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        // Function to parse CSV line
-        let timer = Instant::now();
-        fn parse_csv_line(line: &str) -> Vec<String> {
-            line.split(',').map(|s| s.trim().to_string()).collect()
-        }
+    fn parse_csv_line(line: &str) -> Vec<String> {
+        line.split(',').map(|s| s.trim().to_string()).collect()
+    }
 
-        let left_index = self
-            .headers
+    fn get_header_index(headers: &Vec<String>, key: &str) -> Result<usize, Box<dyn Error>> {
+        Ok(headers
             .iter()
-            .position(|h| h == left_key)
-            .ok_or_else(|| format!("Column '{}' not found in left table", left_key))?;
+            .position(|column| column == key)
+            .ok_or_else(|| format!("Column '{}' not found in left table", key))?)
+    }
 
-        let mut right_reader = BufReader::new(right_input);
-        let mut right_headers_line = String::new();
-        right_reader.read_line(&mut right_headers_line)?;
-        let right_headers = parse_csv_line(&right_headers_line);
+    /// Extracts the index of a key from the provided headers
+    fn extract_header_index(headers: &[String], key: &str) -> Result<usize, Box<dyn Error>> {
+        DataFrame::get_header_index(&headers.to_vec(), key)
+    }
 
-        let right_index = right_headers
-            .iter()
-            .position(|h| h == right_key)
-            .ok_or_else(|| format!("Column '{}' not found in right table", right_key))?;
-
-        let mut joined_headers = self.headers.clone();
-        joined_headers.extend(right_headers.iter().filter(|&h| h != right_key).cloned());
-        writeln!(output, "{}", joined_headers.join(","))?;
-
+    /// Parses and stores the right input data into a map using the join key
+    fn build_right_key_map<R: BufRead>(
+        right_input: &mut R,
+        right_index: usize,
+    ) -> Result<BTreeMap<String, Vec<Vec<String>>>, Box<dyn Error>> {
+        let right_reader = BufReader::new(right_input);
         let mut right_index_map: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::new();
+
         for line in right_reader.lines() {
-            let record = parse_csv_line(&line?);
+            let record = DataFrame::parse_csv_line(&line?);
             if record.len() > right_index {
                 let key = record[right_index].to_string();
                 right_index_map.entry(key).or_default().push(record);
             }
         }
+        Ok(right_index_map)
+    }
 
-        let left_reader = BufReader::new(left_input);
-        let mut join_count = 0;
-        let mut last_key = String::new();
+    /// Writes the joined headers to the output
+    fn write_joined_headers<W: Write>(
+        output: &mut W,
+        left_headers: &[String],
+        right_headers: &[String],
+        right_key: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut joined_headers = left_headers.to_vec();
+        joined_headers.extend(right_headers.iter().filter(|&h| h != right_key).cloned());
+        writeln!(output, "{}", joined_headers.join(","))?;
+        Ok(())
+    }
+
+    /// Handles joining logic for each left record
+    fn join_left_record<W: Write>(
+        left_record: Vec<String>,
+        right_rows: Option<&Vec<Vec<String>>>,
+        right_index: usize,
+        right_headers_len: usize,
+        output: &mut W,
+        join_type: &JoinType,
+    ) -> Result<(), Box<dyn Error>> {
+        if let Some(right_rows) = right_rows {
+            for right_row in right_rows {
+                let mut joined_row = left_record.clone();
+                joined_row.extend(
+                    right_row
+                        .iter()
+                        .enumerate()
+                        .filter(|&(i, _)| i != right_index)
+                        .map(|(_, v)| v.clone()),
+                );
+                writeln!(output, "{}", joined_row.join(","))?;
+            }
+        } else if matches!(join_type, JoinType::Left | JoinType::Full) {
+            let mut joined_row = left_record;
+            joined_row.extend(vec!["".to_string(); right_headers_len - 1]);
+            writeln!(output, "{}", joined_row.join(","))?;
+        }
+        Ok(())
+    }
+
+    /// Handles join logic for the right side when using Right or Full join types
+    fn join_right_unmatched<W: Write>(
+        right_key: &str,
+        right_rows: &Vec<Vec<String>>,
+        processed_left_keys: &HashSet<String>,
+        right_index: usize,
+        left_headers_len: usize,
+        output: &mut W,
+    ) -> Result<(), Box<dyn Error>> {
+        if !processed_left_keys.contains(right_key) {
+            for right_row in right_rows {
+                let mut joined_row = vec!["".to_string(); left_headers_len];
+                joined_row.extend(
+                    right_row
+                        .iter()
+                        .enumerate()
+                        .filter(|&(i, _)| i != right_index)
+                        .map(|(_, v)| v.clone()),
+                );
+                writeln!(output, "{}", joined_row.join(","))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Performs a join operation on two CSV streams.
+    pub fn join_stream<R1: BufRead, R2: BufRead, W: Write>(
+        &self,
+        left_input: &mut R1,
+        right_input: &mut R2, // Mutably borrow right_input
+        output: &mut W,
+        left_key: &str,
+        right_key: &str,
+        join_type: &JoinType,
+    ) -> Result<(), Box<dyn Error>> {
+        let timer = Instant::now();
+
+        let left_index = Self::extract_header_index(&self.headers, left_key)?;
+        let mut right_reader = BufReader::new(right_input);
+
+        let mut right_headers_line = String::new();
+        right_reader.read_line(&mut right_headers_line)?;
+        let right_headers = DataFrame::parse_csv_line(&right_headers_line);
+        let right_index = Self::extract_header_index(&right_headers, right_key)?;
+
+        Self::write_joined_headers(output, &self.headers, &right_headers, right_key)?;
+        let right_index_map = Self::build_right_key_map(&mut right_reader, right_index)?;
+
+        let mut left_reader = BufReader::new(left_input);
+        let mut left_headers_line = String::new();
+        left_reader.read_line(&mut left_headers_line)?; // Skip the header line
+        let mut processed_left_keys = HashSet::new();
 
         for line in left_reader.lines() {
-            let left_record = parse_csv_line(&line?);
-            if left_record.len() > left_index {
-                let left_key_value = left_record[left_index].to_string();
+            let left_record = DataFrame::parse_csv_line(&line?);
+            if left_record.len() < left_index {
+                continue;
+            }
+            let left_key_value = left_record[left_index].to_string();
+            processed_left_keys.insert(left_key_value.clone());
 
-                if left_key_value != last_key {
-                    join_count = 0;
-                    last_key = left_key_value.clone();
-                }
+            Self::join_left_record(
+                left_record,
+                right_index_map.get(&left_key_value),
+                right_index,
+                right_headers.len(),
+                output,
+                join_type,
+            )?;
+        }
 
-                if let Some(right_rows) = right_index_map.get(&left_key_value) {
-                    if join_count < right_rows.len() {
-                        let right_row = &right_rows[join_count];
-                        let mut joined_row = left_record.clone();
-                        joined_row.extend(
-                            right_row
-                                .iter()
-                                .enumerate()
-                                .filter(|&(i, _)| i != right_index)
-                                .map(|(_, v)| v.clone()),
-                        );
-                        writeln!(output, "{}", joined_row.join(","))?;
-                        join_count += 1;
-                    }
-                }
+        if matches!(join_type, JoinType::Right | JoinType::Full) {
+            for (right_key, right_rows) in right_index_map.iter() {
+                Self::join_right_unmatched(
+                    right_key,
+                    right_rows,
+                    &processed_left_keys,
+                    right_index,
+                    self.headers.len(),
+                    output,
+                )?;
             }
         }
 
