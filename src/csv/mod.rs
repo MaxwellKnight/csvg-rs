@@ -24,7 +24,7 @@ pub struct DataFrame {
 impl DataFrame {
     /// Creates a new DataFrame with the given name.
     pub fn new(name: String) -> Self {
-        DataFrame {
+        Self {
             name,
             headers: Vec::new(),
             header_indices: HashMap::new(),
@@ -163,7 +163,7 @@ impl DataFrame {
 
     /// Extracts the index of a key from the provided headers
     fn extract_header_index(headers: &[String], key: &str) -> Result<usize, Box<dyn Error>> {
-        DataFrame::get_header_index(&headers.to_vec(), key)
+        Self::get_header_index(&headers.to_vec(), key)
     }
 
     /// Parses and stores the right input data into a map using the join key
@@ -175,7 +175,7 @@ impl DataFrame {
         let mut right_index_map: BTreeMap<String, Vec<Vec<String>>> = BTreeMap::new();
 
         for line in right_reader.lines() {
-            let record = DataFrame::parse_csv_line(&line?);
+            let record = Self::parse_csv_line(&line?);
             if record.len() > right_index {
                 let key = record[right_index].to_string();
                 right_index_map.entry(key).or_default().push(record);
@@ -268,7 +268,7 @@ impl DataFrame {
 
         let mut right_headers_line = String::new();
         right_reader.read_line(&mut right_headers_line)?;
-        let right_headers = DataFrame::parse_csv_line(&right_headers_line);
+        let right_headers = Self::parse_csv_line(&right_headers_line);
         let right_index = Self::extract_header_index(&right_headers, right_key)?;
 
         Self::write_joined_headers(output, &self.headers, &right_headers, right_key)?;
@@ -280,7 +280,7 @@ impl DataFrame {
         let mut processed_left_keys = HashSet::new();
 
         for line in left_reader.lines() {
-            let left_record = DataFrame::parse_csv_line(&line?);
+            let left_record = Self::parse_csv_line(&line?);
             if left_record.len() < left_index {
                 continue;
             }
