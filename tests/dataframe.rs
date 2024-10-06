@@ -4,7 +4,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-use crate::{
+use csvg::{
     cli::JoinType,
     csv::{human_readable_bytes, DataFrame},
 };
@@ -28,7 +28,7 @@ fn test_read_csv_stream() -> Result<(), Box<dyn Error>> {
     }
 
     let mut df = DataFrame::new("test".to_string());
-    df.read_csv_stream(file.path())?;
+    df.read_headers(file.path())?;
 
     assert_eq!(df.headers, vec!["header1", "header2", "header3"]);
     assert_eq!(df.header_indices.len(), 3);
@@ -49,7 +49,7 @@ fn test_write_csv_stream() -> Result<(), Box<dyn Error>> {
     ];
 
     let mut output = Vec::new();
-    df.write_csv_stream(&mut output)?;
+    df.write_headers(&mut output)?;
 
     assert_eq!(String::from_utf8(output)?, "header1,header2,header3\n");
     Ok(())

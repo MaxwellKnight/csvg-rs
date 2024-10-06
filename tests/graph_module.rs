@@ -1,9 +1,9 @@
 use petgraph::graph::UnGraph;
 
-use crate::graph::{self, SerializableGraph};
+use csvg::graph::{self, SerializableGraph};
 use std::collections::HashSet;
 
-use crate::csv::DataFrame;
+use csvg::csv::DataFrame;
 
 // Helper function to create a sample DataFrame
 fn create_sample_dataframe(

@@ -1,4 +1,4 @@
-use crate::sql::parse_sql;
+use csvg::sql::parse_sql;
 use std::error::Error;
 
 #[test]

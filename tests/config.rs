@@ -2,11 +2,11 @@ use petgraph::graph::UnGraph;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-use crate::config::{
+use csvg::config::{
     create_config_folder, graph_cache_exists, read_config, read_graph_cache, redirect_output,
     write_config, write_graph_cache, Config, GraphvizSettings,
 };
-use crate::csv::DataFrame;
+use csvg::csv::DataFrame;
 
 #[test]
 fn test_write_and_read_config() {
