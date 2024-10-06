@@ -59,11 +59,11 @@ fn handle_concat(config: &Config, files: &[String]) -> Result<(), Box<dyn Error>
     }
 
     let mut df = DataFrame::new("concatenated".to_string());
-    df.read_csv_stream(Path::new(&files[0]))?;
+    df.read_headers(Path::new(&files[0]))?;
     let stdout = io::stdout();
 
     let mut writer = BufWriter::new(stdout.lock());
-    df.write_csv_stream(&mut writer)?;
+    df.write_headers(&mut writer)?;
 
     for file in files {
         let file = config.source_path.join(format!("{}.csv", file));
@@ -78,7 +78,7 @@ fn handle_concat(config: &Config, files: &[String]) -> Result<(), Box<dyn Error>
 fn handle_drop(config: &Config, file: &str, columns: &[String]) -> Result<(), Box<dyn Error>> {
     let mut df = DataFrame::new(file.to_string());
     let file = config.source_path.join(format!("{}.csv", file));
-    df.read_csv_stream(&file)?;
+    df.read_headers(&file)?;
 
     let mut input = BufReader::new(File::open(file.clone())?);
     let stdout = io::stdout();
@@ -96,7 +96,7 @@ fn handle_drop(config: &Config, file: &str, columns: &[String]) -> Result<(), Bo
 fn handle_select(config: &Config, file: &str, columns: &[String]) -> Result<(), Box<dyn Error>> {
     let mut df = DataFrame::new(file.to_string());
     let file = config.source_path.join(format!("{}.csv", file));
-    df.read_csv_stream(Path::new(&file.clone()))?;
+    df.read_headers(Path::new(&file.clone()))?;
 
     let mut input = BufReader::new(File::open(file.clone())?);
     let stdout = io::stdout();
@@ -121,7 +121,7 @@ fn handle_join(
 ) -> Result<(), Box<dyn Error>> {
     let mut left_df = DataFrame::new(file1.to_string());
     let file1 = config.source_path.join(format!("{}.csv", file1));
-    left_df.read_csv_stream(&file1)?;
+    left_df.read_headers(&file1)?;
 
     let file2 = config.source_path.join(format!("{}.csv", file2));
     let mut left_input = BufReader::new(File::open(file1.clone())?);

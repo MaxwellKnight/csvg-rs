@@ -34,7 +34,7 @@ impl DataFrame {
     }
 
     /// Reads CSV headers from a file.
-    pub fn read_csv_stream(&mut self, path: &Path) -> Result<(), Box<dyn Error>> {
+    pub fn read_headers(&mut self, path: &Path) -> Result<(), Box<dyn Error>> {
         let file =
             File::open(path).map_err(|e| format!("Failed to open file '{:?}': {}", path, e))?;
         let mut reader = ReaderBuilder::new().has_headers(true).from_reader(file);
@@ -51,7 +51,7 @@ impl DataFrame {
     }
 
     /// Writes CSV headers to a writer.
-    pub fn write_csv_stream<W: Write>(&self, writer: W) -> Result<(), Box<dyn Error>> {
+    pub fn write_headers<W: Write>(&self, writer: W) -> Result<(), Box<dyn Error>> {
         let mut csv_writer = Writer::from_writer(writer);
         csv_writer.write_record(&self.headers)?;
         Ok(())
